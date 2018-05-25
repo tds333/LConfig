@@ -15,7 +15,7 @@ _KEY_CHARS = frozenset(_KEY_CHARS)
 # inspect.getmembers(cls, inspect.isfunction)
 
 
-class Adapters:
+class Adapter:
 
     @staticmethod
     def default(key, values, value):
@@ -28,10 +28,9 @@ class Adapters:
 
     @staticmethod
     def listing(key, values, value):
-        value = value.strip()
         listing = value.split(",")
         if listing:
-            values.extend(listing)
+            values.extend(v.strip() for v in listing)
         return values
 
     @staticmethod
@@ -42,7 +41,7 @@ class Adapters:
     dot = overwrite
 
 
-class Converters:
+class Converter:
 
     BOOLEAN_STATES = {
         "1": True,
@@ -56,31 +55,41 @@ class Converters:
     }
 
     @staticmethod
-    def default(key, values):
+    def default(key, values, config):
         if values:
             return str(values[-1])
         return None
 
     @staticmethod
-    def raw(key, values):
+    def raw(key, values, config):
         return values
 
     @staticmethod
-    def boolean(key, values):
+    def boolean(key, values, config):
         last_value = values[-1].lower()
         return Converters.BOOLEAN_STATES.get(last_value, False)
 
     @staticmethod
-    def integer(key, values):
+    def integer(key, values, config):
         return int(values[-1])
 
     @staticmethod
-    def floatingpoint(key, values):
+    def real(key, values, config):
         return float(values[-1])
 
     @staticmethod
-    def stringlist(key, values):
+    def stringlist(key, values, config):
         return [str(v) for v in values]
+    
+    @staticmethod
+    def intlist(key, values, config):
+        return [int(v) for v in values]
+    
+    @staticmethod
+    def interpolate(key, values, config):
+        # TODO: implement interpolation with ${var}
+        value = values[-1]
+        return value
 
     dot = default
 
@@ -106,36 +115,6 @@ class Converters:
 # 3. return value from converter
 
 
-class ConfigProxy(MutableMapping):
-
-    def __init__(self, config, part):
-        self._config = config
-        self._part = part
-
-    def __getitem__(self, key):
-        return self._config[self._part + key]
-
-    def __setitem__(self, key, value):
-        key = self._part + key
-        self._config[key] = value
-
-    def __delitem__(self, key):
-        key = self._part + key
-        del self._config[key]
-
-    def __iter__(self):
-        for key in self._config:
-            if key.startswith(self._part):
-                yield key
-
-    def __len__(self):
-        return len(list(iter(self)))
-        # return len(self._config)
-
-    def __getattr__(self, name):
-        return self._config.__getattr__(self._part + name)
-
-
 class Config(MutableMapping):
 
     KEY_CHARS = _KEY_CHARS
@@ -148,8 +127,8 @@ class Config(MutableMapping):
         self._data = OrderedDict()
         self._adapter = {}
         self._converter = {}
-        adapters = dict(inspect.getmembers(Adapters, inspect.isfunction))
-        converters = dict(inspect.getmembers(Converters, inspect.isfunction))
+        adapters = dict(inspect.getmembers(Adapter, inspect.isfunction))
+        converters = dict(inspect.getmembers(Converter, inspect.isfunction))
         self.register_adapters(adapters)
         self.register_converters(converters)
 
@@ -177,7 +156,7 @@ class Config(MutableMapping):
         except KeyError as ex:
             raise KeyError("Key %r not found in %r." % (key, self.__class__.__name__))
         converter = self.get_converter(key)
-        return converter(key, values)
+        return converter(key, values, self)
 
     def __setitem__(self, key, value):
         key = self.adapt_key(key)
@@ -259,10 +238,11 @@ class Config(MutableMapping):
             return "dot"
         key_parts = [prefix] + key.split(".")
         keys = []
+        #prefix_key = ".".join(key_parts)
+        #dot_key = ".".join(key_parts[:-1]) + "."
         if len(key_parts) > 2:
             keys.append(".".join(key_parts[:-1]) + ".")
         keys.append(".".join(key_parts))
-        print(keys)
         names = ["default"]
         for k in keys:
             names = self._data.get(k, names)
@@ -273,53 +253,31 @@ class Config(MutableMapping):
         return pformat(data)
 
 
-def main():
-    data = """
-# commnet
-.convert.list. = stringlist
-.convert.list = stringlist
-.adapt.listing = listing
-.convert.listing = stringlist
-key = value
-key2 = value
-dot.key = more value
-bool = true
-int = 11
-float = 1.5
-list = 1
- = 2
-list = 3
-list.a = 1
-list.a = 2
+class ConfigProxy(MutableMapping):
 
-reset = 1
-reset = 2
-reset = 3
-reset =
+    def __init__(self, config, part):
+        self._config = config
+        self._part = part
 
-listing = 1,2,3,4
-= 5,6,7
+    def __getitem__(self, key):
+        return self._config[self._part + key]
 
-#inval_id = 5
-"""
+    def __setitem__(self, key, value):
+        key = self._part + key
+        self._config[key] = value
 
-    cfg = Config()
-    cfg.read_data(data)
-    print(cfg["list"])
-    print(cfg["list.a"])
-    print(cfg)
-    print(cfg.key)
-    print(cfg.dot)
-    print(cfg.dot.key)
-    try:
-        cfg.dot.bla
-    except AttributeError as ex:
-        print(ex)
-    try:
-        cfg["dot.bla"]
-    except KeyError as ex:
-        print(ex)
+    def __delitem__(self, key):
+        key = self._part + key
+        del self._config[key]
 
+    def __iter__(self):
+        for key in self._config:
+            if key.startswith(self._part):
+                yield key
 
-if __name__ == "__main__":
-    main()
+    def __len__(self):
+        return len(list(iter(self)))
+        # return len(self._config)
+
+    def __getattr__(self, name):
+        return self._config.__getattr__(self._part + name)
