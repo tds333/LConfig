@@ -80,11 +80,11 @@ class Converter:
     @staticmethod
     def stringlist(key, values, config):
         return [str(v) for v in values]
-    
+
     @staticmethod
     def intlist(key, values, config):
         return [int(v) for v in values]
-    
+
     @staticmethod
     def interpolate(key, values, config):
         # TODO: implement interpolation with ${var}
@@ -238,8 +238,8 @@ class Config(MutableMapping):
             return "dot"
         key_parts = [prefix] + key.split(".")
         keys = []
-        #prefix_key = ".".join(key_parts)
-        #dot_key = ".".join(key_parts[:-1]) + "."
+        # prefix_key = ".".join(key_parts)
+        # dot_key = ".".join(key_parts[:-1]) + "."
         if len(key_parts) > 2:
             keys.append(".".join(key_parts[:-1]) + ".")
         keys.append(".".join(key_parts))
