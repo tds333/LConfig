@@ -1,7 +1,7 @@
 # lconfig parsing and more
 import string
 from pprint import pformat
-from collections import OrderedDict, ChainMap
+from collections import OrderedDict
 from collections.abc import MutableMapping, Mapping
 from copy import deepcopy
 import inspect
@@ -14,17 +14,18 @@ _KEY_CHARS = frozenset(_KEY_CHARS)
 # hint to get functions from a class
 # inspect.getmembers(cls, inspect.isfunction)
 
+
 class Adapters:
-    
+
     @staticmethod
     def default(key, values, value):
         value = value.strip()
         if value:
             values.append(value)
         else:
-            return None # delete key
+            return None  # delete key
         return values
-    
+
     @staticmethod
     def listing(key, values, value):
         value = value.strip()
@@ -32,49 +33,56 @@ class Adapters:
         if listing:
             values.extend(listing)
         return values
-    
+
     @staticmethod
     def overwrite(key, values, value):
         value = value.strip()
         return [value]
-    
+
     dot = overwrite
 
 
 class Converters:
 
-    BOOLEAN_STATES = {'1': True, 'yes': True, 'true': True, 'on': True,
-                      '0': False, 'no': False, 'false': False, 'off': False}
-    
+    BOOLEAN_STATES = {
+        "1": True,
+        "yes": True,
+        "true": True,
+        "on": True,
+        "0": False,
+        "no": False,
+        "false": False,
+        "off": False,
+    }
+
     @staticmethod
     def default(key, values):
         if values:
             return str(values[-1])
         return None
-    
+
     @staticmethod
     def raw(key, values):
         return values
-    
+
     @staticmethod
     def boolean(key, values):
         last_value = values[-1].lower()
         return Converters.BOOLEAN_STATES.get(last_value, False)
-    
+
     @staticmethod
     def integer(key, values):
         return int(values[-1])
-    
+
     @staticmethod
     def floatingpoint(key, values):
         return float(values[-1])
-    
+
     @staticmethod
     def stringlist(key, values):
         return [str(v) for v in values]
-    
-    dot = default
 
+    dot = default
 
 
 # a .default specified as string
@@ -88,8 +96,6 @@ class Converters:
 # for this key, this must not be a string
 
 
-
-
 # setting a value
 # 1. call adapter with value
 # 2. set return value from adapter
@@ -99,15 +105,16 @@ class Converters:
 # 2. call converter
 # 3. return value from converter
 
+
 class ConfigProxy(MutableMapping):
 
     def __init__(self, config, part):
         self._config = config
         self._part = part
-    
+
     def __getitem__(self, key):
         return self._config[self._part + key]
-    
+
     def __setitem__(self, key, value):
         key = self._part + key
         self._config[key] = value
@@ -123,8 +130,8 @@ class ConfigProxy(MutableMapping):
 
     def __len__(self):
         return len(list(iter(self)))
-        #return len(self._config)
-    
+        # return len(self._config)
+
     def __getattr__(self, name):
         return self._config.__getattr__(self._part + name)
 
@@ -132,11 +139,11 @@ class ConfigProxy(MutableMapping):
 class Config(MutableMapping):
 
     KEY_CHARS = _KEY_CHARS
-    #default_prefix = ".default"
-    #validator_prefix = ".validate"
+    # default_prefix = ".default"
+    # validator_prefix = ".validate"
     adapter_prefix = ".adapt"
     converter_prefix = ".convert"
-    
+
     def __init__(self):
         self._data = OrderedDict()
         self._adapter = {}
@@ -145,22 +152,25 @@ class Config(MutableMapping):
         converters = dict(inspect.getmembers(Converters, inspect.isfunction))
         self.register_adapters(adapters)
         self.register_converters(converters)
-    
+
     @classmethod
     def adapt_key(cls, key):
         assert isinstance(key, str)
         key = key.strip()
         not_allowed_chars = set(key) - cls.KEY_CHARS
         if not_allowed_chars:
-            raise ValueError("Detected not allowed character(s): %r in key %r." % ("".join(not_allowed_chars), key))
+            raise ValueError(
+                "Detected not allowed character(s): %r in key %r."
+                % ("".join(not_allowed_chars), key)
+            )
         return key
-    
+
     def get_raw(self, key):
         return self._data[key]
-    
+
     def raw_dict(self):
         return deepcopy(self._data)
-    
+
     def __getitem__(self, key):
         try:
             values = self._data[key]
@@ -168,7 +178,7 @@ class Config(MutableMapping):
             raise KeyError("Key %r not found in %r." % (key, self.__class__.__name__))
         converter = self.get_converter(key)
         return converter(key, values)
-    
+
     def __setitem__(self, key, value):
         key = self.adapt_key(key)
         if key in self._data:
@@ -190,14 +200,13 @@ class Config(MutableMapping):
 
     def __len__(self):
         return len(self._data)
-    
+
     def __getattr__(self, name):
         try:
             return self[name]
         except KeyError:
             pass
         dotname = name + "."
-        keys = []
         for key in self:
             if key.startswith(dotname):
                 return ConfigProxy(config=self, part=dotname)
@@ -206,7 +215,7 @@ class Config(MutableMapping):
     def read_file(self, file):
         with open(file, mode="r", encoding="utf8") as config_file:
             self.read_data(config_file)
-    
+
     def read_data(self, data):
         last_key = ""
         for line in data.splitlines():
@@ -214,12 +223,12 @@ class Config(MutableMapping):
             if line.startswith("#") or not line:
                 continue
             key, _, value = line.partition("=")
-            if key: # allows empty key be same as last key
+            if key:  # allows empty key be same as last key
                 last_key = key
             else:
                 key = last_key
             self[key] = value
-    
+
     def read_dict(self, data, level=""):
         for key in data:
             value = data[key]
@@ -228,23 +237,23 @@ class Config(MutableMapping):
                 self.read_dict(value, level)
             else:
                 self[level + key] = value
-    
+
     def register_adapters(self, adapters):
         for name, adapter in adapters.items():
             self._adapter[name] = adapter
-    
+
     def get_adapter(self, key):
         name = self.resolve_name(key, self.adapter_prefix)
         return self._adapter.get(name)
-    
+
     def register_converters(self, converters, name=None):
         for name, converter in converters.items():
             self._converter[name] = converter
-    
+
     def get_converter(self, key):
         name = self.resolve_name(key, self.converter_prefix)
         return self._converter.get(name)
-    
+
     def resolve_name(self, key, prefix=""):
         if key.startswith("."):
             return "dot"
@@ -258,12 +267,10 @@ class Config(MutableMapping):
         for k in keys:
             names = self._data.get(k, names)
         return str(names[-1])
-    
+
     def __str__(self):
-        data = {key:self[key] for key in self if not key.startswith(".")}
+        data = {key: self[key] for key in self if not key.startswith(".")}
         return pformat(data)
-
-
 
 
 def main():
@@ -313,5 +320,6 @@ listing = 1,2,3,4
     except KeyError as ex:
         print(ex)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()
