@@ -14,30 +14,42 @@ _KEY_CHARS = frozenset(_KEY_CHARS)
 # hint to get functions from a class
 # inspect.getmembers(cls, inspect.isfunction)
 
+class Interpolate(string.Template):
+
+    idpattern = r'(?-i:[\.a-zA-Z][\.a-zA-Z0-9]*)'
+
 
 class Adapter:
 
     @staticmethod
-    def default(key, values, value):
-        value = value.strip()
+    def append(key, values, config):
+        value = values.pop()
+        if value:
+            values.append(value)
+        return values
+    
+    @staticmethod
+    def overwrite(key, values, config):
+        return [values[-1]]
+
+    @staticmethod
+    def append_reset(key, values, config):
+        value = values.pop()
         if value:
             values.append(value)
         else:
-            return None  # delete key
+            return None  # empty value deletes key
         return values
 
     @staticmethod
-    def listing(key, values, value):
-        listing = value.split(",")
-        if listing:
-            values.extend(v.strip() for v in listing)
+    def listing(key, values, config):
+        value = values.pop()
+        new_values = value.split(",")
+        if new_values:
+            values.extend(v.strip() for v in new_values if v.strip())
         return values
 
-    @staticmethod
-    def overwrite(key, values, value):
-        value = value.strip()
-        return [value]
-
+    default = append
     dot = overwrite
 
 
@@ -55,10 +67,8 @@ class Converter:
     }
 
     @staticmethod
-    def default(key, values, config):
-        if values:
-            return str(values[-1])
-        return None
+    def string(key, values, config):
+        return str(values[-1])
 
     @staticmethod
     def raw(key, values, config):
@@ -67,7 +77,7 @@ class Converter:
     @staticmethod
     def boolean(key, values, config):
         last_value = values[-1].lower()
-        return Converters.BOOLEAN_STATES.get(last_value, False)
+        return Converter.BOOLEAN_STATES.get(last_value, False)
 
     @staticmethod
     def integer(key, values, config):
@@ -87,11 +97,14 @@ class Converter:
 
     @staticmethod
     def interpolate(key, values, config):
-        # TODO: implement interpolation with ${var}
-        value = values[-1]
+        # one level interpolation
+        value = str(values[-1])
+        if "$" in value:
+            value = Interpolate(value).substitute(config)
         return value
 
-    dot = default
+    default = string
+    dot = string
 
 
 # a .default specified as string
@@ -134,8 +147,7 @@ class Config(MutableMapping):
 
     @classmethod
     def adapt_key(cls, key):
-        assert isinstance(key, str)
-        key = key.strip()
+        key = str(key).strip()
         not_allowed_chars = set(key) - cls.KEY_CHARS
         if not_allowed_chars:
             raise ValueError(
@@ -151,12 +163,15 @@ class Config(MutableMapping):
         return deepcopy(self._data)
 
     def __getitem__(self, key):
+        key = str(key).strip()
         try:
             values = self._data[key]
         except KeyError as ex:
             raise KeyError("Key %r not found in %r." % (key, self.__class__.__name__))
         converter = self.get_converter(key)
-        return converter(key, values, self)
+        if converter is not None:
+            return converter(key, values, self)
+        return values
 
     def __setitem__(self, key, value):
         key = self.adapt_key(key)
@@ -164,12 +179,14 @@ class Config(MutableMapping):
             values = self._data[key]
         else:
             values = []
+        values.append(str(value).strip())
         adapter = self.get_adapter(key)
-        values = adapter(key, values, value)
-        if values is None:
-            del self._data[key]
-        else:
+        if adapter is not None:
+            values = adapter(key, values, self)
+        if values:
             self._data[key] = values
+        else:
+            del self._data[key]
 
     def __delitem__(self, key):
         del self._data[key]
@@ -271,9 +288,10 @@ class ConfigProxy(MutableMapping):
         del self._config[key]
 
     def __iter__(self):
+        part_len = len(self._part)
         for key in self._config:
             if key.startswith(self._part):
-                yield key
+                yield key[part_len:]
 
     def __len__(self):
         return len(list(iter(self)))

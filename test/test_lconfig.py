@@ -7,6 +7,7 @@ TESTDATA = """
 .convert.list = stringlist
 .adapt.listing = listing
 .convert.listing = stringlist
+.convert.interpolate. = interpolate
 key = value
 key2 = value
 dot.key = more value
@@ -27,7 +28,9 @@ reset =
 listing = 1,2,3,4
 = 5,6,7
 
-#inval_id = 5
+interpolate.a = ${key} is the value of key
+interpolate.b = ${interpolate.a} is 2
+interpolate.c = $bool
 """
 
 
@@ -68,6 +71,24 @@ def test_access(cfg):
 
 def test_get_raw(cfg):
     assert cfg.get_raw("list.a") == ["1", "2"]
+
+
+def test_interpolate(cfg):
+    value = cfg.interpolate.a
+    assert value == "value is the value of key"
+    value = cfg.interpolate.b
+    assert value == "value is the value of key is 2"
+    value = cfg.interpolate.c
+    assert value == "true"
+
+
+def test_iter(cfg):
+    assert len(list(iter(cfg))) == 18
+
+
+def test_iter_proxy(cfg):
+    proxy = cfg.interpolate
+    assert list(iter(proxy)) == ['a', 'b', 'c']
 
 
 def off():
