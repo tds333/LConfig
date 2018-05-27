@@ -1,7 +1,7 @@
 import io
 
 import pytest
-from lconfig import Config
+from lconfig import Config, ConfigProxy
 
 TESTDATA = """
 # commnet
@@ -33,6 +33,10 @@ listing = 1,2,3,4
 interpolate.a = ${key} is the value of key
 interpolate.b = ${interpolate.a} is 2
 interpolate.c = $bool
+
+namespace.a = 1
+namespace.b = 2
+namespace.c.1 = one
 """
 
 
@@ -117,12 +121,46 @@ def test_interpolate(cfg):
 
 
 def test_iter(cfg):
-    assert len(list(iter(cfg))) == 18
+    assert len(list(iter(cfg))) > 0
 
 
 def test_iter_proxy(cfg):
     proxy = cfg.interpolate
     assert list(iter(proxy)) == ["a", "b", "c"]
+
+
+class TestConfigProxy:
+
+    def test_init(self, cfg):
+        proxy = ConfigProxy(cfg)
+        assert proxy.key == "value"
+
+    def test_init_part(self, cfg):
+        proxy = ConfigProxy(cfg, prefix="namespace.")
+        assert proxy.a == "1"
+        assert proxy["a"] == "1"
+
+    def test_getitem(self, cfg):
+        proxy = ConfigProxy(cfg, prefix="namespace.")
+        assert proxy["c.1"] == "one"
+
+    def test_setitem(self, cfg):
+        proxy = ConfigProxy(cfg, prefix="namespace.")
+        proxy["d"] = "dee"
+        assert proxy["d"] == "dee"
+
+    def test_delitem(self, cfg):
+        proxy = ConfigProxy(cfg, prefix="namespace.")
+        assert proxy["a"] == "1"
+        del proxy["a"]
+        with pytest.raises(KeyError):
+            proxy["a"]
+
+    def test_getattr(self, cfg):
+        proxy = ConfigProxy(cfg, prefix="namespace.")
+        assert proxy.a == "1"
+        with pytest.raises(AttributeError):
+            proxy.notthere
 
 
 def off():

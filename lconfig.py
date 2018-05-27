@@ -3,7 +3,6 @@ import string
 from pprint import pformat
 from collections import OrderedDict
 from collections.abc import MutableMapping, Mapping
-from copy import deepcopy
 import inspect
 
 _KEY_CHARS = string.ascii_lowercase
@@ -129,8 +128,6 @@ class Converter:
 class Config(MutableMapping):
 
     KEY_CHARS = _KEY_CHARS
-    # default_prefix = ".default"
-    # validator_prefix = ".validate"
     adapter_prefix = ".adapt"
     converter_prefix = ".convert"
 
@@ -156,9 +153,6 @@ class Config(MutableMapping):
 
     def get_raw(self, key):
         return self._data[key]
-
-    def raw_dict(self):
-        return deepcopy(self._data)
 
     def __getitem__(self, key):
         key = str(key).strip()
@@ -203,10 +197,14 @@ class Config(MutableMapping):
         dotname = name + "."
         for key in self:
             if key.startswith(dotname):
-                return ConfigProxy(config=self, part=dotname)
+                return ConfigProxy(config=self, prefix=dotname)
         raise AttributeError("Config key %r not found." % name)
 
-    def read_data(self, data):
+    def __contains__(self, key):
+        key = str(key).strip()
+        return key in self._data
+
+    def read_data(self, data, prefix=""):
         last_key = ""
         for line in data:
             line = line.strip()
@@ -214,45 +212,45 @@ class Config(MutableMapping):
                 continue
             key, _, value = line.partition("=")
             if key:  # allows empty key be same as last key
+                key = prefix + key
                 last_key = key
             else:
                 key = last_key
             self[key] = value
 
-    def read_dict(self, data, level=""):
+    def read_dict(self, data, prefix=""):
         for key in data:
             value = data[key]
             if isinstance(value, str):
-                self[level + key] = value
+                self[prefix + key] = value
             elif isinstance(value, Mapping):
-                level = key + "."
-                self.read_dict(value, level)
+                prefix = key + "."
+                self.read_dict(value, prefix)
             else:
-                self._data[level + key] = [str(v).strip() for v in value]
+                self._data[prefix + key] = [str(v).strip() for v in value]
 
-    def read_file(self, filename):
+    def read_file(self, filename, prefix=""):
         with open(filename, mode="r", encoding="utf8") as config_file:
-            self.read_data(config_file)
+            self.read_data(config_file, prefix)
 
     def write_data(self, data, dot=False):
         for key in self:
-            if not dot:
-                if key.startswith("."):
-                    continue
+            if not dot and key.startswith("."):
+                continue
             values = self.get_raw(key)
             for value in values:
                 data.write("{key} = {value}\n".format(key=key, value=value))
 
-    def write_file(self, filename):
+    def write_file(self, filename, dot=False):
         with open(filename, mode="w", encoding="utf8") as config_file:
-            self.write_data(config_file)
+            self.write_data(config_file, dot)
 
     def register_adapters(self, adapters):
         for name, adapter in adapters.items():
             self._adapter[name] = adapter
 
     def get_adapter(self, key):
-        name = self.resolve_name(key, self.adapter_prefix)
+        name = self.resolve_name(key, self.adapter_prefix, "default")
         return self._adapter.get(name)
 
     def register_converters(self, converters, name=None):
@@ -260,23 +258,37 @@ class Config(MutableMapping):
             self._converter[name] = converter
 
     def get_converter(self, key):
-        name = self.resolve_name(key, self.converter_prefix)
+        name = self.resolve_name(key, self.converter_prefix, "default")
         return self._converter.get(name)
 
-    def resolve_name(self, key, prefix=""):
+    def resolve_name_old(self, key, prefix="", default=None):
         if key.startswith("."):
             return "dot"
         key_parts = [prefix] + key.split(".")
         keys = []
-        # prefix_key = ".".join(key_parts)
-        # dot_key = ".".join(key_parts[:-1]) + "."
         if len(key_parts) > 2:
             keys.append(".".join(key_parts[:-1]) + ".")
         keys.append(".".join(key_parts))
-        names = ["default"]
+        names = []
         for k in keys:
             names = self._data.get(k, names)
-        return str(names[-1])
+        if names:
+            return str(names[-1])
+        return default
+
+    def resolve_name(self, key, prefix="", default=None):
+        if key.startswith("."):
+            return "dot"
+        key_parts = [prefix] + key.split(".")
+        search_key = prefix + "." + key
+        while key_parts:
+            if search_key in self._data:
+                return str(self._data[search_key][-1])
+            if not key_parts:
+                break
+            key_parts.pop()
+            search_key = ".".join(key_parts) + "."
+        return default
 
     def __str__(self):
         data = {key: self[key] for key in self if not key.startswith(".")}
@@ -285,31 +297,31 @@ class Config(MutableMapping):
 
 class ConfigProxy(MutableMapping):
 
-    def __init__(self, config, part):
+    def __init__(self, config, prefix=""):
         self._config = config
-        if not part.endswith("."):
-            part = part + "."
-        self._part = part
+        if prefix and not prefix.endswith("."):
+            prefix = prefix + "."
+        self._prefix = prefix
 
     def __getitem__(self, key):
-        return self._config[self._part + key]
+        return self._config[self._prefix + key]
 
     def __setitem__(self, key, value):
-        key = self._part + key
+        key = self._prefix + key
         self._config[key] = value
 
     def __delitem__(self, key):
-        key = self._part + key
+        key = self._prefix + key
         del self._config[key]
 
     def __iter__(self):
-        part_len = len(self._part)
+        prefix_len = len(self._prefix)
         for key in self._config:
-            if key.startswith(self._part):
-                yield key[part_len:]
+            if key.startswith(self._prefix):
+                yield key[prefix_len:]
 
     def __len__(self):
         return len(list(iter(self)))
 
     def __getattr__(self, name):
-        return self._config.__getattr__(self._part + name)
+        return self._config.__getattr__(self._prefix + name)
