@@ -3,5 +3,6 @@
     "python.pythonPath": "${workspaceFolder}/venv/py3.6/bin/python",
     "python.linting.pylintEnabled": false,
     "python.linting.flake8Enabled": true,
-    "python.formatting.provider": "none"
+    "python.formatting.provider": "none",
+    "editor.rulers": [80]
 }

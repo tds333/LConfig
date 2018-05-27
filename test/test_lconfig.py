@@ -1,3 +1,5 @@
+import io
+
 import pytest
 from lconfig import Config
 
@@ -37,7 +39,7 @@ interpolate.c = $bool
 @pytest.fixture
 def cfg():
     cfg = Config()
-    cfg.read_data(TESTDATA)
+    cfg.read_data(TESTDATA.splitlines())
     yield cfg
 
 
@@ -48,8 +50,40 @@ def test_init():
 
 def test_read_data():
     cfg = Config()
-    cfg.read_data(TESTDATA)
+    cfg.read_data(TESTDATA.splitlines())
     assert cfg.key == "value"
+    cfg = Config()
+    cfg.read_data(io.StringIO(TESTDATA))
+    assert cfg.key == "value"
+
+
+def test_read_dict():
+    cfg = Config()
+    cfg.read_dict({"a": "b"})
+    assert cfg["a"] == "b"
+
+
+def test_read_dict_level():
+    cfg = Config()
+    cfg.read_dict({"a": {"1": "one", "2": "two"}})
+    assert cfg["a.1"] == "one"
+    assert cfg["a.2"] == "two"
+
+
+def test_read_dict_list():
+    cfg = Config()
+    cfg.read_dict({"a": ["1", "2"], "b": ["eins", "zwei"]})
+    assert cfg["a"] == "2"
+    assert cfg["b"] == "zwei"
+    assert cfg.get_raw("a") == ["1", "2"]
+
+
+def test_write_data():
+    cfg = Config()
+    cfg["key"] = "value"
+    output = io.StringIO()
+    cfg.write_data(output)
+    assert output.getvalue() == "key = value\n"
 
 
 def test_convert(cfg):

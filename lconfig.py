@@ -206,13 +206,9 @@ class Config(MutableMapping):
                 return ConfigProxy(config=self, part=dotname)
         raise AttributeError("Config key %r not found." % name)
 
-    def read_file(self, file):
-        with open(file, mode="r", encoding="utf8") as config_file:
-            self.read_data(config_file)
-
     def read_data(self, data):
         last_key = ""
-        for line in data.splitlines():
+        for line in data:
             line = line.strip()
             if line.startswith("#") or not line:
                 continue
@@ -226,11 +222,30 @@ class Config(MutableMapping):
     def read_dict(self, data, level=""):
         for key in data:
             value = data[key]
-            if isinstance(value, Mapping):
+            if isinstance(value, str):
+                self[level + key] = value
+            elif isinstance(value, Mapping):
                 level = key + "."
                 self.read_dict(value, level)
             else:
-                self[level + key] = value
+                self._data[level + key] = [str(v).strip() for v in value]
+
+    def read_file(self, filename):
+        with open(filename, mode="r", encoding="utf8") as config_file:
+            self.read_data(config_file)
+
+    def write_data(self, data, dot=False):
+        for key in self:
+            if not dot:
+                if key.startswith("."):
+                    continue
+            values = self.get_raw(key)
+            for value in values:
+                data.write("{key} = {value}\n".format(key=key, value=value))
+
+    def write_file(self, filename):
+        with open(filename, mode="w", encoding="utf8") as config_file:
+            self.write_data(config_file)
 
     def register_adapters(self, adapters):
         for name, adapter in adapters.items():
@@ -272,6 +287,8 @@ class ConfigProxy(MutableMapping):
 
     def __init__(self, config, part):
         self._config = config
+        if not part.endswith("."):
+            part = part + "."
         self._part = part
 
     def __getitem__(self, key):
@@ -293,7 +310,6 @@ class ConfigProxy(MutableMapping):
 
     def __len__(self):
         return len(list(iter(self)))
-        # return len(self._config)
 
     def __getattr__(self, name):
         return self._config.__getattr__(self._part + name)
