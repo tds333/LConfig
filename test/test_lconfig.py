@@ -88,7 +88,7 @@ def test_iter(cfg):
 
 def test_iter_proxy(cfg):
     proxy = cfg.interpolate
-    assert list(iter(proxy)) == ['a', 'b', 'c']
+    assert list(iter(proxy)) == ["a", "b", "c"]
 
 
 def off():

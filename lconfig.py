@@ -11,12 +11,10 @@ _KEY_CHARS += string.digits
 _KEY_CHARS += "."
 _KEY_CHARS = frozenset(_KEY_CHARS)
 
-# hint to get functions from a class
-# inspect.getmembers(cls, inspect.isfunction)
 
 class Interpolate(string.Template):
 
-    idpattern = r'(?-i:[\.a-zA-Z][\.a-zA-Z0-9]*)'
+    idpattern = r"(?-i:[\.a-zA-Z][\.a-zA-Z0-9]*)"
 
 
 class Adapter:
@@ -27,7 +25,7 @@ class Adapter:
         if value:
             values.append(value)
         return values
-    
+
     @staticmethod
     def overwrite(key, values, config):
         return [values[-1]]
