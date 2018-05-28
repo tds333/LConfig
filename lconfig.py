@@ -5,18 +5,23 @@ from collections import OrderedDict
 from collections.abc import MutableMapping, Mapping
 import inspect
 
+__all__ = ["LConfig", "LConfigProxy", "Adapter", "Converter"]
+
 _KEY_CHARS = string.ascii_lowercase
 _KEY_CHARS += string.digits
-_KEY_CHARS += "."
-_KEY_CHARS = frozenset(_KEY_CHARS)
+_KEY_CHARS += "." + "_"
 
 
 class Interpolate(string.Template):
 
-    idpattern = r"(?-i:[\.a-zA-Z][\.a-zA-Z0-9]*)"
+    idpattern = r"(?-i:[\._a-z0-9][\._a-z0-9]*)"
 
 
 class Adapter:
+
+    @staticmethod
+    def raw(key, values, config):
+        return values
 
     @staticmethod
     def append(key, values, config):
@@ -94,7 +99,6 @@ class Converter:
 
     @staticmethod
     def interpolate(key, values, config):
-        # one level interpolation
         value = str(values[-1])
         if "$" in value:
             value = Interpolate(value).substitute(config)
@@ -104,30 +108,9 @@ class Converter:
     dot = string
 
 
-# a .default specified as string
-# .type specifies the type of the value (str, int, bool, ...), see typing
-# the converter should return this type of value
-# .adapt specifies as string reference to an adapter function
-# an adapter should only output one valid string value for the key
-# optionally it can be checked if it is valid with the right type
-# .convert specifies as string reference to a converter function
-# a converter gets a list of string value and returns a valid type
-# for this key, this must not be a string
+class LConfig(MutableMapping):
 
-
-# setting a value
-# 1. call adapter with value
-# 2. set return value from adapter
-
-# getting a value
-# 1. get value or default
-# 2. call converter
-# 3. return value from converter
-
-
-class Config(MutableMapping):
-
-    KEY_CHARS = _KEY_CHARS
+    KEY_CHARS = frozenset(_KEY_CHARS)
     adapter_prefix = ".adapt"
     converter_prefix = ".convert"
 
@@ -153,6 +136,9 @@ class Config(MutableMapping):
 
     def get_raw(self, key):
         return self._data[key]
+
+    def set_raw(self, key, values):
+        self._data[key] = values
 
     def __getitem__(self, key):
         key = str(key).strip()
@@ -197,7 +183,7 @@ class Config(MutableMapping):
         dotname = name + "."
         for key in self:
             if key.startswith(dotname):
-                return ConfigProxy(config=self, prefix=dotname)
+                return LConfigProxy(config=self, prefix=dotname)
         raise AttributeError("Config key %r not found." % name)
 
     def __contains__(self, key):
@@ -249,36 +235,29 @@ class Config(MutableMapping):
         for name, adapter in adapters.items():
             self._adapter[name] = adapter
 
-    def get_adapter(self, key):
-        name = self.resolve_name(key, self.adapter_prefix, "default")
+    def get_adapter(self, key, default="default"):
+        name = self.resolve_name(key, self.adapter_prefix, default)
         return self._adapter.get(name)
 
-    def register_converters(self, converters, name=None):
+    def adapter_names(self):
+        return list(iter(self._adapter))
+
+    def register_converters(self, converters):
         for name, converter in converters.items():
             self._converter[name] = converter
 
-    def get_converter(self, key):
-        name = self.resolve_name(key, self.converter_prefix, "default")
+    def get_converter(self, key, default="default"):
+        name = self.resolve_name(key, self.converter_prefix, default)
         return self._converter.get(name)
 
-    def resolve_name_old(self, key, prefix="", default=None):
-        if key.startswith("."):
-            return "dot"
-        key_parts = [prefix] + key.split(".")
-        keys = []
-        if len(key_parts) > 2:
-            keys.append(".".join(key_parts[:-1]) + ".")
-        keys.append(".".join(key_parts))
-        names = []
-        for k in keys:
-            names = self._data.get(k, names)
-        if names:
-            return str(names[-1])
-        return default
+    def converter_names(self):
+        return list(iter(self._converter))
 
     def resolve_name(self, key, prefix="", default=None):
         if key.startswith("."):
             return "dot"
+        elif key == "":
+            return default
         key_parts = [prefix] + key.split(".")
         search_key = prefix + "." + key
         while key_parts:
@@ -295,7 +274,7 @@ class Config(MutableMapping):
         return pformat(data)
 
 
-class ConfigProxy(MutableMapping):
+class LConfigProxy(MutableMapping):
 
     def __init__(self, config, prefix=""):
         self._config = config
@@ -325,3 +304,22 @@ class ConfigProxy(MutableMapping):
 
     def __getattr__(self, name):
         return self._config.__getattr__(self._prefix + name)
+
+    def __contains__(self, key):
+        key = self._prefix + str(key).strip()
+        return key in self._config
+
+    def read_data(self, data):
+        self._config.read_data(data, self._prefix)
+
+    def read_dict(self, data):
+        self._config.read_dict(data, self._prefix)
+
+    def read_file(self, filename):
+        self._config.read_file(filename, self._prefix)
+
+    def get_config(self):
+        return self._config
+
+    def get_prefix(self):
+        return self._prefix
