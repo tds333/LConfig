@@ -1,4 +1,5 @@
 import io
+import os
 import inspect
 
 import pytest
@@ -47,6 +48,15 @@ namespace.a = 1
 namespace.b = 2
 namespace.c.1 = one
 """
+
+
+@pytest.fixture
+def testfile():
+    from pathlib import Path
+
+    testdir = Path(__file__).parent
+    test1_file = testdir / "test1.cfg"
+    yield test1_file
 
 
 @pytest.fixture
@@ -164,6 +174,11 @@ class TestLConfig:
         assert cfg.resolve_name("s.l1", ".test") == "lvl1"
         assert cfg.resolve_name("s.l1.5", ".test") == "l0"
         assert cfg.resolve_name("z.l1.5", ".testoff", "default") == "default"
+
+    def test_read_file(self, testfile):
+        cfg = LConfig()
+        cfg.read_file(testfile)
+        assert cfg.key == "value"
 
 
 class TestLConfigProxy:

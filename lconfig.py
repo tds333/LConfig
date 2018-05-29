@@ -1,4 +1,5 @@
 # lconfig parsing and more
+import os
 import string
 from pprint import pformat
 from collections import OrderedDict
@@ -216,6 +217,7 @@ class LConfig(MutableMapping):
                 self._data[prefix + key] = [str(v).strip() for v in value]
 
     def read_file(self, filename, prefix=""):
+        filename = os.fspath(filename)
         with open(filename, mode="r", encoding="utf8") as config_file:
             self.read_data(config_file, prefix)
 
@@ -228,6 +230,7 @@ class LConfig(MutableMapping):
                 data.write("{key} = {value}\n".format(key=key, value=value))
 
     def write_file(self, filename, dot=False):
+        filename = os.fspath(filename)
         with open(filename, mode="w", encoding="utf8") as config_file:
             self.write_data(config_file, dot)
 
