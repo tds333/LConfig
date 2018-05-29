@@ -1,5 +1,4 @@
 import io
-import os
 import inspect
 
 import pytest
@@ -164,7 +163,7 @@ class TestLConfig:
         name = cfg.resolve_name(key="", prefix="", default="d")
         assert name == "d"
         name = cfg.resolve_name(key="d", prefix="", default=None)
-        assert name == None
+        assert name is None
         assert cfg.resolve_name("key.a", ".test") == "l0"
         assert cfg.resolve_name("key.a.b.c", ".test") == "l0"
         assert cfg.resolve_name("l1.a", ".test") == "l1"
