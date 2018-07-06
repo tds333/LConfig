@@ -21,8 +21,9 @@ ConverterFunction = Callable[[str, List[str], "LConfig"], Any]
 class LConfig(MutableMapping):
 
     KEY_CHARS = frozenset(_KEY_CHARS)
-    adapter_prefix = ".adapt"
-    converter_prefix = ".convert"
+    _adapter_prefix = ".adapt"
+    _converter_prefix = ".convert"
+    _default_prefix = ".default"
 
     def __init__(self):
         self._data: Dict[str, List[str]] = OrderedDict()
@@ -151,7 +152,7 @@ class LConfig(MutableMapping):
     def get_adapter(
         self, key: str, default: str = "default"
     ) -> Optional[AdapterFunction]:
-        name = self.resolve_name(key, self.adapter_prefix, default)
+        name = self.resolve_name(key, self._adapter_prefix, default)
         return self._adapter.get(name)
 
     def adapter_names(self):
@@ -164,7 +165,7 @@ class LConfig(MutableMapping):
     def get_converter(
         self, key: str, default: str = "default"
     ) -> Optional[ConverterFunction]:
-        name = self.resolve_name(key, self.converter_prefix, default)
+        name = self.resolve_name(key, self._converter_prefix, default)
         return self._converter.get(name)
 
     def converter_names(self) -> List[str]:
