@@ -1,6 +1,6 @@
 {
     "python.venvPath": "${workspaceFolder}/venv",
-    "python.pythonPath": "${workspaceFolder}/venv/py3.6/bin/python",
+    "python.pythonPath": "${workspaceFolder}/venv/bin/python",
     "python.linting.pylintEnabled": false,
     "python.linting.flake8Enabled": true,
     "python.formatting.provider": "none",
