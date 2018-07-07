@@ -75,8 +75,10 @@ class LConfig(MutableMapping):
             values = adapter(key, values, self)
         if values:
             self._data[key] = values
-        else:
+        elif values is None:
             del self._data[key]
+        else:  # False/empty values reset to default
+            self._data[key] = self.get_default(key)
 
     def __delitem__(self, key: str):
         del self._data[key]
@@ -144,6 +146,10 @@ class LConfig(MutableMapping):
         filename = os.fspath(filename)
         with open(filename, mode="w", encoding="utf8") as config_file:
             self.write_data(config_file, dot)
+
+    def get_default(self, key: str, default: str = "") -> str:
+        value = self.resolve_name(key, self._default_prefix, default)
+        return value
 
     def register_adapters(self, adapters: Mapping):
         for name, adapter in adapters.items():
@@ -266,7 +272,7 @@ class Adapter:
         return [values[-1]]
 
     @staticmethod
-    def append_reset(key, values, config):
+    def append_remove(key, values, config):
         value = values.pop()
         if value:
             values.append(value)
