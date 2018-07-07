@@ -23,7 +23,6 @@ class LConfig(MutableMapping):
     KEY_CHARS = frozenset(_KEY_CHARS)
     _adapter_prefix = ".adapt"
     _converter_prefix = ".convert"
-    _default_prefix = ".default"
 
     def __init__(self):
         self._data: Dict[str, List[str]] = OrderedDict()
@@ -75,10 +74,8 @@ class LConfig(MutableMapping):
             values = adapter(key, values, self)
         if values:
             self._data[key] = values
-        elif values is None:
+        else:
             del self._data[key]
-        else:  # False/empty values reset to default
-            self._data[key] = self.get_default(key)
 
     def __delitem__(self, key: str):
         del self._data[key]
@@ -147,10 +144,6 @@ class LConfig(MutableMapping):
         with open(filename, mode="w", encoding="utf8") as config_file:
             self.write_data(config_file, dot)
 
-    def get_default(self, key: str, default: str = "") -> str:
-        value = self.resolve_name(key, self._default_prefix, default)
-        return value
-
     def register_adapters(self, adapters: Mapping):
         for name, adapter in adapters.items():
             self._adapter[name] = adapter
@@ -199,7 +192,6 @@ class LConfig(MutableMapping):
 
 
 class LConfigProxy(MutableMapping):
-
     def __init__(self, config: "LConfig", prefix: str = "") -> None:
         self._config = config
         if prefix and not prefix.endswith("."):
@@ -255,16 +247,8 @@ class Interpolate(string.Template):
 
 
 class Adapter:
-
     @staticmethod
     def raw(key: str, values: List[str], config: LConfig):
-        return values
-
-    @staticmethod
-    def append(key, values, config):
-        value = values.pop()
-        if value:
-            values.append(value)
         return values
 
     @staticmethod
@@ -272,12 +256,49 @@ class Adapter:
         return [values[-1]]
 
     @staticmethod
-    def append_remove(key, values, config):
+    def append(key, values, config):
+        """
+        Append new value if it is not empty.
+        """
+        value = values.pop()
+        if value:
+            values.append(value)
+        return values
+
+    @staticmethod
+    def append_default(key, values, config):
+        """
+        Append new value. Empty value resets to default
+        """
+        value = values.pop()
+        if value:
+            values.append(value)
+        else:  # empty value resets to default
+            values = [config.resolve_name(key, prefix=".default", default="")]
+        return values
+
+    @staticmethod
+    def append_delete(key, values, config):
+        """
+        Append new value. Empty value deletes key
+        """
         value = values.pop()
         if value:
             values.append(value)
         else:
             return None  # empty value deletes key
+        return values
+
+    @staticmethod
+    def append_remove(key, values, config):
+        """
+        Append new value. Empty value removes last value
+        """
+        value = values.pop()
+        if value:
+            values.append(value)
+        elif values:
+            values.pop()
         return values
 
     @staticmethod

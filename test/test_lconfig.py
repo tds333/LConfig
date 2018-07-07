@@ -16,6 +16,10 @@ TESTDATA = """
 .convert.listing = stringlist
 .convert.interpolate. = interpolate
 
+# test default
+.default.dkey = default
+.adapt.dkey = append_default
+
 # test config data
 key = value
 key2 = value
@@ -74,7 +78,6 @@ def test_import_all():
 
 
 class TestLConfig:
-
     def test_init(self):
         cfg = LConfig()
         assert len(cfg) == 0
@@ -179,9 +182,27 @@ class TestLConfig:
         cfg.read_file(testfile)
         assert cfg.key == "value"
 
+    def test_default(self, cfg):
+        cfg["dkey"] = "xyz"
+        assert cfg["dkey"] == "xyz"
+        cfg["dkey"] = ""
+        assert cfg["dkey"] == "default"
+
+    def test_items(self, cfg):
+        for key, value in cfg.items():
+            assert isinstance(key, str)
+
+    def test_performance(self):
+        cfg = LConfig()
+        for i in range(1000):
+            key = f"key_{i}"
+            value = f"value for {i}"
+            cfg[key] = value
+        for key, value in cfg.items():
+            assert isinstance(key, str)
+
 
 class TestLConfigProxy:
-
     def test_init(self, cfg):
         proxy = LConfigProxy(cfg)
         assert proxy.key == "value"
