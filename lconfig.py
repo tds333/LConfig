@@ -14,7 +14,7 @@ _KEY_CHARS += string.digits
 _KEY_CHARS += "." + "_"
 
 # typing
-AdapterFunction = Callable[[str, List[str], "LConfig"], Optional[List[str]]]
+AdapterFunction = Callable[[str, Any, List[str], "LConfig"], List[str]]
 ConverterFunction = Callable[[str, List[str], "LConfig"], Any]
 
 
@@ -61,7 +61,7 @@ class LConfig(MutableMapping):
         return values
 
     def __setitem__(self, key: str, value: str):
-        values: Optional[List[str]]
+        values: List[str]
         key = self.adapt_key(key)
         values = self._data.get(key, [])
         adapter = self.get_adapter(key)
@@ -297,7 +297,7 @@ class Adapter:
         if value:
             values.append(str(value))
         else:
-            return None  # empty value deletes key
+            return []  # empty value deletes key
         return values
 
     @staticmethod
