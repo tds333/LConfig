@@ -137,12 +137,23 @@ Adapter
 An adapter is executed when a value is assigned to a key.
 ``config["key"] = 'my value'``
 
+An adapter returns a list of unicode strings or None.
+
 
 Converter
 ---------
 
 A converter is executed when a value for a key is retrieved.
 ``value = config["key"]``
+
+The input of a converter is a list of unicode strings and the output
+is the converted value.
+
+
+Both adapter and converter operate on the list of unicode strings internally
+used to store the configuration. This internal storage format is fixed
+and can be easily serialized back into a file or stream with the defined
+syntax.
 
 
 Interpolation
