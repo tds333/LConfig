@@ -52,6 +52,22 @@ namespace.b = 2
 namespace.c.1 = one
 """
 
+TESTDATA_SEC = """
+# commnet
+.convert.isec. = interpolate
+
+# test config data
+key = value
+
+[section]
+key = value_sec
+int = 11
+ = 2
+
+[isec]
+interpolate.a = ${section.key} is the value of key
+"""
+
 
 @pytest.fixture
 def testfile():
@@ -89,6 +105,13 @@ class TestLConfig:
         cfg = LConfig()
         cfg.read_data(io.StringIO(TESTDATA))
         assert cfg.key == "value"
+
+    def test_read_data_sec(self):
+        cfg = LConfig()
+        cfg.read_data(TESTDATA_SEC.splitlines())
+        print(cfg)
+        assert cfg.key == "value"
+        assert cfg.section.key == "value_sec"
 
     def test_read_dict(self):
         cfg = LConfig()

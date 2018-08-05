@@ -51,7 +51,6 @@ class LConfig(MutableMapping):
         self._data[key] = values
 
     def __getitem__(self, key: str):
-        key = str(key).strip()
         try:
             values = self._data[key]
         except KeyError as ex:
@@ -64,14 +63,12 @@ class LConfig(MutableMapping):
     def __setitem__(self, key: str, value: str):
         values: Optional[List[str]]
         key = self.adapt_key(key)
-        if key in self._data:
-            values = self._data[key]
-        else:
-            values = []
-        values.append(str(value).strip())
+        values = self._data.get(key, [])
         adapter = self.get_adapter(key)
         if adapter is not None:
-            values = adapter(key, values, self)
+            values = adapter(key, value, values, self)
+        else:
+            values.append(str(value))
         if values:
             self._data[key] = values
         else:
@@ -102,20 +99,37 @@ class LConfig(MutableMapping):
         return key in self._data
 
     def read_data(self, data: Iterable, prefix: str = ""):
+        if prefix and not prefix.endswith("."):
+            prefix = prefix + "."
         last_key = ""
-        for line in data:
+        for number, line in enumerate(data):
             line = line.strip()
             if line.startswith("#") or not line:
                 continue
+            if line.startswith("[") and line.endswith("]"):
+                prefix = line[1:-1].strip()
+                if not prefix.endswith("."):
+                    prefix = prefix + "."
+                continue
             key, _, value = line.partition("=")
+            if _ != "=":
+                raise ValueError("Invalid format in line %d: %r."
+                                 " No '=' assignement found." % (number, line))
+            key = key.strip().lower()
+            value = value.strip()
             if key:  # allows empty key be same as last key
                 key = prefix + key
                 last_key = key
             else:
                 key = last_key
-            self[key] = value
+            try:
+                self[key] = value
+            except ValueError as ex:
+                raise ValueError("In line %d: %r.\nError: %s" % (number, line, ex))
 
     def read_dict(self, data: Mapping, prefix: str = ""):
+        if prefix and not prefix.endswith("."):
+            prefix = prefix + "."
         for key in data:
             value = data[key]
             if isinstance(value, str):
@@ -124,7 +138,7 @@ class LConfig(MutableMapping):
                 prefix = key + "."
                 self.read_dict(value, prefix)
             else:
-                self._data[prefix + key] = [str(v).strip() for v in value]
+                self._data[prefix + key] = [str(v) for v in value]
 
     def read_file(self, filename, prefix: str = ""):
         filename = os.fspath(filename)
@@ -248,63 +262,58 @@ class Interpolate(string.Template):
 
 class Adapter:
     @staticmethod
-    def raw(key: str, values: List[str], config: LConfig):
-        return values
+    def raw(key: str, value: Any, values: List[str], config: LConfig):
+        return values.append(str(value))
 
     @staticmethod
-    def overwrite(key, values, config):
-        return [values[-1]]
+    def overwrite(key, value, values, config):
+        return [str(value)]
 
     @staticmethod
-    def append(key, values, config):
+    def append(key, value, values, config):
         """
         Append new value if it is not empty.
         """
-        value = values.pop()
         if value:
-            values.append(value)
+            values.append(str(value))
         return values
 
     @staticmethod
-    def append_default(key, values, config):
+    def append_default(key, value, values, config):
         """
         Append new value. Empty value resets to default
         """
-        value = values.pop()
         if value:
-            values.append(value)
+            values.append(str(value))
         else:  # empty value resets to default
             values = [config.resolve_name(key, prefix=".default", default="")]
         return values
 
     @staticmethod
-    def append_delete(key, values, config):
+    def append_delete(key, value, values, config):
         """
         Append new value. Empty value deletes key
         """
-        value = values.pop()
         if value:
-            values.append(value)
+            values.append(str(value))
         else:
             return None  # empty value deletes key
         return values
 
     @staticmethod
-    def append_remove(key, values, config):
+    def append_remove(key, value, values, config):
         """
         Append new value. Empty value removes last value
         """
-        value = values.pop()
         if value:
-            values.append(value)
+            values.append(str(value))
         elif values:
             values.pop()
         return values
 
     @staticmethod
-    def listing(key, values, config):
-        value = values.pop()
-        new_values = value.split(",")
+    def listing(key, value, values, config):
+        new_values = str(value).split(",")
         if new_values:
             values.extend(v.strip() for v in new_values if v.strip())
         return values
