@@ -5,7 +5,7 @@ from pprint import pformat
 from collections import OrderedDict
 from collections.abc import MutableMapping, Mapping
 import inspect
-from typing import List, Dict, Iterable, Optional, Callable, Any, Iterator
+from typing import List, Dict, Iterable, Optional, Callable, Any, Iterator, Union
 
 __all__ = ["LConfig", "LConfigProxy", "Adapter", "Converter"]
 
@@ -106,7 +106,9 @@ class LConfig(MutableMapping):
         key = str(key).strip()
         return key in self._data
 
-    def read_data(self, data: Iterable, prefix: str = ""):
+    def read_data(self, data: Union[Iterable, str], prefix: str = ""):
+        if isinstance(data, str):
+            data = data.splitlines()
         prefix = make_prefix(prefix)
         last_key = ""
         for number, line in enumerate(data):
@@ -118,8 +120,10 @@ class LConfig(MutableMapping):
                 continue
             key, _, value = line.partition("=")
             if _ != "=":
-                raise ValueError("Invalid format in line %d: %r."
-                                 " No '=' assignement found." % (number, line))
+                raise ValueError(
+                    "Invalid format in line %d: %r."
+                    " No '=' assignement found." % (number, line)
+                )
             key = key.strip().lower()
             value = value.strip()
             if key:  # allows empty key be same as last key
@@ -236,6 +240,12 @@ class LConfigProxy(MutableMapping):
 
     def __getattr__(self, name: str) -> Any:
         return self._config.__getattr__(self._prefix + name)
+
+    # def __setattr__(self, name: str, value: Any):
+    #     print(name)
+    #     if name.startswith("_"):
+    #         super().__setattr__(name, value)
+    #     self[name] = value
 
     def __contains__(self, key: Any) -> bool:
         key = self._prefix + str(key).strip()

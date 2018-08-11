@@ -105,6 +105,9 @@ class TestLConfig:
         cfg = LConfig()
         cfg.read_data(io.StringIO(TESTDATA))
         assert cfg.key == "value"
+        cfg = LConfig()
+        cfg.read_data(TESTDATA)
+        assert cfg.key == "value"
 
     def test_read_data_sec(self):
         cfg = LConfig()
@@ -137,6 +140,31 @@ class TestLConfig:
         output = io.StringIO()
         cfg.write_data(output)
         assert output.getvalue() == "key = value\n"
+
+    def test_getitem(self, cfg):
+        assert cfg["key"] == "value"
+
+    def test_setitem(self):
+        cfg = LConfig()
+        cfg["adf"] = "my value"
+        assert cfg["adf"] == "my value"
+
+    def test_getitem_dot(self, cfg):
+        proxy = cfg["namespace."]
+        assert proxy.a == "1"
+        with pytest.raises(KeyError):
+            proxy["notthere"]
+
+    def test_getitem_dot_empty(self, cfg):
+        proxy = cfg["namespaces."]
+        with pytest.raises(KeyError):
+            proxy["notthere"]
+
+    def test_assign_proxy(self):
+        cfg = LConfig()
+        proxy = cfg["section."]
+        proxy["a"] = 5
+        assert cfg["section.a"] == "5"
 
     def test_convert(self, cfg):
         assert isinstance(cfg.list, list)
