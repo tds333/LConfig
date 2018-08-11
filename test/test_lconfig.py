@@ -267,10 +267,19 @@ class TestLConfigProxy:
         proxy = LConfigProxy(cfg, prefix="namespace.")
         assert proxy["c.1"] == "one"
 
-    def test_setitem(self, cfg):
+    def test_setitem(self):
+        cfg = LConfig().read_data(TESTDATA)
         proxy = LConfigProxy(cfg, prefix="namespace.")
         proxy["d"] = "dee"
         assert proxy["d"] == "dee"
+        with pytest.raises(ValueError):
+            proxy["  e   "] = "ee"
+
+    def test_setitem_error(self):
+        cfg = LConfig().read_data(TESTDATA)
+        proxy = LConfigProxy(cfg, prefix="namespace.")
+        with pytest.raises(ValueError):
+            proxy["§$%§d"] = "dee"
 
     def test_delitem(self, cfg):
         proxy = LConfigProxy(cfg, prefix="namespace.")
@@ -284,6 +293,19 @@ class TestLConfigProxy:
         assert proxy.a == "1"
         with pytest.raises(AttributeError):
             proxy.notthere
+
+    def test_setattr(self):
+        cfg = LConfig()
+        cfg["a"] = "a"
+        assert cfg.a == "a"
+        cfg.a = "b"
+        assert cfg.a == "b"
+
+    def test_setattr_error(self):
+        cfg = LConfig()
+        proxy = cfg["namespace."]
+        with pytest.raises(AttributeError):
+            proxy.a = "b"
 
     def test_iter(self, cfg):
         proxy = LConfigProxy(cfg, prefix="namespace.")

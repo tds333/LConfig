@@ -41,7 +41,7 @@ class LConfig(MutableMapping):
 
     @classmethod
     def adapt_key(cls, key: str) -> str:
-        key = str(key).strip()
+        key = str(key)
         not_allowed_chars = set(key) - cls.KEY_CHARS
         if not_allowed_chars:
             raise ValueError(
@@ -102,8 +102,15 @@ class LConfig(MutableMapping):
                 return LConfigProxy(config=self, prefix=dotname)
         raise AttributeError("Config key %r not found." % name)
 
-    def __contains__(self, key) -> bool:
-        key = str(key).strip()
+    def __setattr__(self, name: str, value: Any):
+        if name.startswith("_"):
+            super().__setattr__(name, value)
+        elif name in self:
+            self[name] = value
+        else:
+            raise AttributeError("Attribute %r not found." % name)
+
+    def __contains__(self: "LConfig", key: str) -> bool:
         return key in self._data
 
     def read_data(self, data: Union[Iterable, str], prefix: str = ""):
@@ -135,6 +142,7 @@ class LConfig(MutableMapping):
                 self[key] = value
             except ValueError as ex:
                 raise ValueError("In line %d: %r.\nError: %s" % (number, line, ex))
+        return self
 
     def read_dict(self, data: Mapping, prefix: str = ""):
         prefix = make_prefix(prefix)
@@ -143,15 +151,16 @@ class LConfig(MutableMapping):
             if isinstance(value, str):
                 self[prefix + key] = value
             elif isinstance(value, Mapping):
-                prefix = make_prefix(key)
-                self.read_dict(value, prefix)
+                self.read_dict(value, make_prefix(prefix + key))
             else:
                 self._data[prefix + key] = [str(v) for v in value]
+        return self
 
     def read_file(self, filename, prefix: str = ""):
         filename = os.fspath(filename)
         with open(filename, mode="r", encoding="utf8") as config_file:
             self.read_data(config_file, prefix)
+        return self
 
     def write_data(self, data, dot: bool = False):
         for key in self:
@@ -222,7 +231,7 @@ class LConfigProxy(MutableMapping):
         return self._config[self._prefix + key]
 
     def __setitem__(self, key: str, value: str):
-        key = self._prefix + key
+        key = self._prefix + LConfig.adapt_key(key)
         self._config[key] = value
 
     def __delitem__(self, key: str):
@@ -241,24 +250,26 @@ class LConfigProxy(MutableMapping):
     def __getattr__(self, name: str) -> Any:
         return self._config.__getattr__(self._prefix + name)
 
-    # def __setattr__(self, name: str, value: Any):
-    #     print(name)
-    #     if name.startswith("_"):
-    #         super().__setattr__(name, value)
-    #     self[name] = value
+    def __setattr__(self, name: str, value: Any):
+        if name.startswith("_"):
+            super().__setattr__(name, value)
+        elif name in self:
+            self[name] = value
+        else:
+            raise AttributeError("Attribute %r not found." % name)
 
-    def __contains__(self, key: Any) -> bool:
-        key = self._prefix + str(key).strip()
+    def __contains__(self, key: str) -> bool:
+        key = self._prefix + key
         return key in self._config
 
     def read_data(self, data):
-        self._config.read_data(data, self._prefix)
+        return self._config.read_data(data, self._prefix)
 
     def read_dict(self, data):
-        self._config.read_dict(data, self._prefix)
+        return self._config.read_dict(data, self._prefix)
 
     def read_file(self, filename):
-        self._config.read_file(filename, self._prefix)
+        return self._config.read_file(filename, self._prefix)
 
     def get_config(self) -> LConfig:
         return self._config
