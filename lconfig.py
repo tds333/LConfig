@@ -18,6 +18,12 @@ AdapterFunction = Callable[[str, Any, List[str], "LConfig"], List[str]]
 ConverterFunction = Callable[[str, List[str], "LConfig"], Any]
 
 
+def make_prefix(prefix: str):
+    if prefix and not prefix.endswith("."):
+        prefix = prefix + "."
+    return prefix
+
+
 class LConfig(MutableMapping):
 
     KEY_CHARS = frozenset(_KEY_CHARS)
@@ -54,6 +60,8 @@ class LConfig(MutableMapping):
         try:
             values = self._data[key]
         except KeyError as ex:
+            if key.endswith("."):
+                return LConfigProxy(self, key)
             raise KeyError("Key %r not found in %r." % (key, self.__class__.__name__))
         converter = self.get_converter(key)
         if converter is not None:
@@ -99,17 +107,14 @@ class LConfig(MutableMapping):
         return key in self._data
 
     def read_data(self, data: Iterable, prefix: str = ""):
-        if prefix and not prefix.endswith("."):
-            prefix = prefix + "."
+        prefix = make_prefix(prefix)
         last_key = ""
         for number, line in enumerate(data):
             line = line.strip()
             if line.startswith("#") or not line:
                 continue
             if line.startswith("[") and line.endswith("]"):
-                prefix = line[1:-1].strip()
-                if not prefix.endswith("."):
-                    prefix = prefix + "."
+                prefix = make_prefix(line[1:-1].strip())
                 continue
             key, _, value = line.partition("=")
             if _ != "=":
@@ -128,14 +133,13 @@ class LConfig(MutableMapping):
                 raise ValueError("In line %d: %r.\nError: %s" % (number, line, ex))
 
     def read_dict(self, data: Mapping, prefix: str = ""):
-        if prefix and not prefix.endswith("."):
-            prefix = prefix + "."
+        prefix = make_prefix(prefix)
         for key in data:
             value = data[key]
             if isinstance(value, str):
                 self[prefix + key] = value
             elif isinstance(value, Mapping):
-                prefix = key + "."
+                prefix = make_prefix(key)
                 self.read_dict(value, prefix)
             else:
                 self._data[prefix + key] = [str(v) for v in value]
@@ -208,9 +212,7 @@ class LConfig(MutableMapping):
 class LConfigProxy(MutableMapping):
     def __init__(self, config: "LConfig", prefix: str = "") -> None:
         self._config = config
-        if prefix and not prefix.endswith("."):
-            prefix = prefix + "."
-        self._prefix = prefix
+        self._prefix = make_prefix(prefix)
 
     def __getitem__(self, key: str):
         return self._config[self._prefix + key]
