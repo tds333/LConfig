@@ -162,18 +162,18 @@ class LConfig(MutableMapping):
             self.read_data(config_file, prefix)
         return self
 
-    def write_data(self, data, dot: bool = False):
+    def write_data(self, data, key_filter: Optional[callable] = None):
+        key_filter = lambda key: True if key_filter is None else key_filter
         for key in self:
-            if not dot and key.startswith("."):
-                continue
-            values = self.get_raw(key)
-            for value in values:
-                data.write("{key} = {value}\n".format(key=key, value=value))
+            if key_filter(key):
+                values = self.get_raw(key)
+                for value in values:
+                    data.write("{key} = {value}\n".format(key=key, value=value))
 
-    def write_file(self, filename, dot=False):
+    def write_file(self, filename, key_filter=None):
         filename = os.fspath(filename)
         with open(filename, mode="w", encoding="utf8") as config_file:
-            self.write_data(config_file, dot)
+            self.write_data(config_file, key_filter)
 
     def register_adapters(self, adapters: Mapping):
         for name, adapter in adapters.items():
