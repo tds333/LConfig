@@ -4,6 +4,7 @@ import string
 from pprint import pformat
 from collections import OrderedDict
 from collections.abc import MutableMapping, Mapping
+from json import dumps, loads
 import inspect
 from typing import List, Dict, Iterable, Optional, Callable, Any, Iterator, Union
 
@@ -68,7 +69,7 @@ class LConfig(MutableMapping):
             return converter(key, values, self)
         return values
 
-    def __setitem__(self, key: str, value: str):
+    def __setitem__(self, key: str, value: Any):
         values: List[str]
         key = self.adapt_key(key)
         values = self._data.get(key, [])
@@ -342,6 +343,19 @@ class Adapter:
             values.extend(v.strip() for v in new_values if v.strip())
         return values
 
+    @staticmethod
+    def json(key, value, values, config):
+        """
+        Adapt value to a Json string and append it.
+        """
+        if isinstance(value, str):
+            jvalue = value
+        else:
+            jvalue = dumps(value)
+        if jvalue:
+            values.append(jvalue)
+        return values
+
     default = append
     dot = overwrite
 
@@ -394,6 +408,10 @@ class Converter:
         if "$" in value:
             value = Interpolate(value).substitute(config)
         return value
+
+    @staticmethod
+    def json(key: str, values: List[str], config: LConfig):
+        return loads(values[-1])
 
     default = string
     dot = string

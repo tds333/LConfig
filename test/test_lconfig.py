@@ -53,6 +53,23 @@ namespace.c.1 = one
 
 empty_new_key =
 
+new_key_second =
+ = one
+ = two
+
+.adapt.json. = json
+.convert.json. = json
+
+json.list = [1,2]
+json.int = 1
+json.str = "abc"
+json.object = {"a": "b"}
+json.float = 3.14
+json.null = null
+json.bool = true
+
+.convert.cjson. = json
+cjson.list = [1,2,3, "a"]
 """
 
 TESTDATA_SEC = """
@@ -254,6 +271,26 @@ class TestLConfig:
             cfg[key] = value
         for key, value in cfg.items():
             assert isinstance(key, str)
+
+    def test_empty_new_key(self, cfg):
+        assert "empty_new_key" not in cfg
+
+    def test_new_key_second(self, cfg):
+        assert "new_key_second" in cfg
+        assert cfg.get_raw("new_key_second") == ["one", "two"]
+
+    def test_json(self, cfg):
+        assert cfg.json.list == [1, 2]
+        assert cfg["json.int"] == 1
+        assert cfg["json.str"] == "abc"
+        assert cfg["json.float"] == 3.14
+        assert cfg["json.object"] == {"a": "b"}
+        assert cfg["json.bool"] == True
+        assert cfg["json.null"] == None
+        assert cfg["cjson.list"] == [1,2,3, "a"]
+        cfg["json.myvalue"] = {"a": [1, True, 0.0, None]}
+        assert cfg["json.myvalue"] == {"a": [1, True, 0.0, None]}
+
 
 
 class TestLConfigProxy:
