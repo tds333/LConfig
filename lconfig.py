@@ -223,6 +223,7 @@ class LConfig(MutableMapping):
 
 
 class LConfigProxy(MutableMapping):
+
     def __init__(self, config: "LConfig", prefix: str = "") -> None:
         self._config = config
         self._prefix = make_prefix(prefix)

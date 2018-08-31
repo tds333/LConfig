@@ -319,6 +319,13 @@ class TestLConfigProxy:
         proxy = LConfigProxy(cfg, prefix="namespace.")
         assert proxy.get_prefix() == "namespace."
 
+    def test_read_data(self):
+        cfg = LConfig()
+        proxy = LConfigProxy(cfg, prefix="namespace.")
+        proxy.read_data("key = value")
+        assert proxy.key == "value"
+        assert list(proxy) == ["key"]
+
 
 def off():
     print(cfg["list"])
