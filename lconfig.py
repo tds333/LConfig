@@ -79,7 +79,7 @@ class LConfig(MutableMapping):
             values.append(str(value))
         if values:
             self._data[key] = values
-        else:
+        elif key in self._data:
             del self._data[key]
 
     def __delitem__(self, key: str):

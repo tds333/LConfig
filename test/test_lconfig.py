@@ -50,6 +50,9 @@ interpolate.d = $interpolate.d.1 ${interpolate.d.1} $$
 namespace.a = 1
 namespace.b = 2
 namespace.c.1 = one
+
+empty_new_key =
+
 """
 
 TESTDATA_SEC = """
