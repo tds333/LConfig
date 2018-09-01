@@ -27,6 +27,7 @@ def make_prefix(prefix: str):
 
 class LConfig(MutableMapping):
 
+    ASSIGN_CHAR = "="
     KEY_CHARS = frozenset(_KEY_CHARS)
     _adapter_prefix = ".adapt"
     _converter_prefix = ".convert"
@@ -126,11 +127,11 @@ class LConfig(MutableMapping):
             if line.startswith("[") and line.endswith("]"):
                 prefix = make_prefix(line[1:-1].strip())
                 continue
-            key, _, value = line.partition("=")
-            if _ != "=":
+            key, _, value = line.partition(self.ASSIGN_CHAR)
+            if _ != self.ASSIGN_CHAR:
                 raise ValueError(
                     "Invalid format in line %d: %r."
-                    " No '=' assignement found." % (number, line)
+                    " No %r found to asign a value." % (number, line, self.ASSIGN_CHAR)
                 )
             key = key.strip().lower()
             value = value.strip()
@@ -169,7 +170,7 @@ class LConfig(MutableMapping):
             if key_filter(key):
                 values = self.get_raw(key)
                 for value in values:
-                    data.write("{key} = {value}\n".format(key=key, value=value))
+                    data.write("{key} {sep} {value}\n".format(key=key, value=value, sep=self.ASSIGN_CHAR))
 
     def write_file(self, filename, key_filter=None):
         filename = os.fspath(filename)
