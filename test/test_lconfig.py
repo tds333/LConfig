@@ -285,12 +285,11 @@ class TestLConfig:
         assert cfg["json.str"] == "abc"
         assert cfg["json.float"] == 3.14
         assert cfg["json.object"] == {"a": "b"}
-        assert cfg["json.bool"] == True
-        assert cfg["json.null"] == None
-        assert cfg["cjson.list"] == [1,2,3, "a"]
+        assert cfg["json.bool"] is True
+        assert cfg["json.null"] is None
+        assert cfg["cjson.list"] == [1, 2, 3, "a"]
         cfg["json.myvalue"] = {"a": [1, True, 0.0, None]}
         assert cfg["json.myvalue"] == {"a": [1, True, 0.0, None]}
-
 
 
 class TestLConfigProxy:
