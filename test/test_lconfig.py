@@ -2,7 +2,15 @@ import io
 import inspect
 
 import pytest
-from lconfig import LConfig, LConfigProxy, Adapter, Converter
+from lconfig import (
+    LConfig,
+    LConfigProxy,
+    Adapter,
+    Converter,
+    TolerantParser,
+    SimpleIniParser,
+)
+
 
 TESTDATA = """
 # commnet
@@ -20,6 +28,11 @@ TESTDATA = """
 .default.dkey = default
 .adapt.dkey = append_default
 
+# json testing
+.adapt.json. = json
+.convert.json. = json
+.convert.cjson. = json
+
 # test config data
 key = value
 key2 = value
@@ -28,7 +41,7 @@ bool = true
 int = 11
 float = 1.5
 list = 1
- = 2
+list = 2
 list = 3
 list.a = 1
 list.a = 2
@@ -39,7 +52,7 @@ reset = 3
 reset =
 
 listing = 1,2,3,4
-= 5,6,7
+listing = 5,6,7
 
 interpolate.a = ${key} is the value of key
 interpolate.b = ${interpolate.a} is 2
@@ -54,11 +67,8 @@ namespace.c.1 = one
 empty_new_key =
 
 new_key_second =
- = one
- = two
-
-.adapt.json. = json
-.convert.json. = json
+new_key_second = one
+new_key_second = two
 
 json.list = [1,2]
 json.int = 1
@@ -68,24 +78,7 @@ json.float = 3.14
 json.null = null
 json.bool = true
 
-.convert.cjson. = json
 cjson.list = [1,2,3, "a"]
-"""
-
-TESTDATA_SEC = """
-# commnet
-.convert.isec. = interpolate
-
-# test config data
-key = value
-
-[section]
-key = value_sec
-int = 11
- = 2
-
-[isec]
-interpolate.a = ${section.key} is the value of key
 """
 
 
@@ -114,6 +107,7 @@ def test_import_all():
 
 
 class TestLConfig:
+
     def test_init(self):
         cfg = LConfig()
         assert len(cfg) == 0
@@ -128,13 +122,6 @@ class TestLConfig:
         cfg = LConfig()
         cfg.read_data(TESTDATA)
         assert cfg.key == "value"
-
-    def test_read_data_sec(self):
-        cfg = LConfig()
-        cfg.read_data(TESTDATA_SEC.splitlines())
-        print(cfg)
-        assert cfg.key == "value"
-        assert cfg.section.key == "value_sec"
 
     def test_read_dict(self):
         cfg = LConfig()
@@ -293,6 +280,7 @@ class TestLConfig:
 
 
 class TestLConfigProxy:
+
     def test_init(self, cfg):
         proxy = LConfigProxy(cfg)
         assert proxy.key == "value"
@@ -366,18 +354,76 @@ class TestLConfigProxy:
         assert list(proxy) == ["key"]
 
 
-def off():
-    print(cfg["list"])
-    print(cfg["list.a"])
-    print(cfg)
-    print(cfg.key)
-    print(cfg.dot)
-    print(cfg.dot.key)
-    try:
-        cfg.dot.bla
-    except AttributeError as ex:
-        print(ex)
-    try:
-        cfg["dot.bla"]
-    except KeyError as ex:
-        print(ex)
+TESTDATA_TOLERANT = """
+# test tolerant config format
+KEY = value
+
+KEY.2 = value_sec
+int = 11
+= 2
+"""
+
+
+@pytest.fixture
+def tcfg():
+
+    class TConfig(LConfig):
+        PARSER = TolerantParser
+
+    cfg = TConfig()
+    cfg.read_data(TESTDATA_TOLERANT)
+    yield cfg
+
+
+class TestTolerantParser:
+    pass
+
+
+TESTDATA_INI = """
+# test ini style
+key = value
+
+[section]
+key = value_sec
+int = 2
+
+[sec2]
+key = v
+
+[multi]
+line = line1
+    line2
+    line3
+"""
+
+
+@pytest.fixture
+def ini_cfg():
+
+    class IniAdapter(Adapter):
+        default = Adapter.append
+
+    class IniConverter(Converter):
+        default = Converter.stringjoin
+
+    class IniConfig(LConfig):
+        PARSER = SimpleIniParser
+        ADAPTER = IniAdapter
+        CONVERTER = IniConverter
+
+    cfg = IniConfig()
+    cfg.read_data(TESTDATA_INI)
+    yield cfg
+
+
+class TestSimpleIniParser:
+
+    def test_read_data_sec(self, ini_cfg):
+        assert ini_cfg.key == "value"
+        assert ini_cfg.section.key == "value_sec"
+
+    def test_double_assign(self, ini_cfg):
+        assert ini_cfg["section.int"] == "2"
+
+    def test_multiline(self, ini_cfg):
+        assert ini_cfg["multi.line"] == "line1\nline2\nline3"
