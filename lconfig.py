@@ -74,7 +74,8 @@ class Adapter:
 
     @staticmethod
     def raw(key: str, value: Any, values: List[str], config: "LConfig"):
-        return values.append(str(value))
+        values.append(str(value))
+        return values
 
     @staticmethod
     def overwrite(key, value, values, config):
