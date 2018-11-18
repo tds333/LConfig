@@ -266,7 +266,7 @@ class LConfig(MutableMapping):
     def __getitem__(self, key: str):
         try:
             values = self._data[key]
-        except KeyError as ex:
+        except KeyError:
             if key.endswith("."):
                 return LConfigProxy(self, key)
             raise KeyError("Key %r not found in %r." % (key, self.__class__.__name__))
