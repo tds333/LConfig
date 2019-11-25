@@ -19,10 +19,10 @@ AdapterFunction = Callable[[str, Any, List[str], "LConfig"], List[str]]
 ConverterFunction = Callable[[str, List[str], "LConfig"], Any]
 
 
-def make_prefix(prefix: str):
+def make_prefix(prefix: str, key: str = ""):
     if prefix and not prefix.endswith("."):
-        prefix = prefix + "."
-    return prefix
+        prefix = f"{prefix}.{key}"
+    return f"{prefix}{key}"
 
 
 class Parser:
@@ -44,7 +44,6 @@ class StrictParser(Parser):
     def read_data(self, lconfig, data: Union[Iterable, str], prefix: str = ""):
         if isinstance(data, str):
             data = data.splitlines()
-        prefix = make_prefix(prefix)
         for number, line in enumerate(data):
             line = line.strip()
             if line.startswith("#") or not line:
@@ -62,7 +61,7 @@ class StrictParser(Parser):
                     "Invalid or empty key %r in line %d: %r." % (orig_key, number, line)
                 )
             value = value.strip()
-            key = prefix + key
+            key = make_prefix(prefix, key)
             try:
                 lconfig[key] = value
             except ValueError as ex:
@@ -321,15 +320,15 @@ class LConfig(MutableMapping):
         return key in self._data
 
     def read_dict(self, data: Mapping, prefix: str = ""):
-        prefix = make_prefix(prefix)
         for key in data:
             value = data[key]
+            prefix_key = make_prefix(prefix, key)
             if isinstance(value, str):
-                self[prefix + key] = value
+                self[prefix_key] = value
             elif isinstance(value, Mapping):
-                self.read_dict(value, make_prefix(prefix + key))
+                self.read_dict(value, prefix_key)
             else:
-                self._data[prefix + key] = [str(v) for v in value]
+                self._data[prefix_key] = [str(v) for v in value]
         return self
 
     def read_data(self, data: Union[Iterable, str], prefix: str = ""):
@@ -385,7 +384,7 @@ class LConfig(MutableMapping):
         elif key == "":
             return default
         key_parts = [prefix] + key.split(".")
-        search_key = prefix + "." + key
+        search_key = f"{prefix}.{key}"
         while key_parts:
             if search_key in self._data:
                 return str(self._data[search_key][-1])
@@ -468,7 +467,6 @@ class TolerantParser(Parser):
     def read_data(self, lconfig, data: Iterable, prefix: str = ""):
         if isinstance(data, str):
             data = data.splitlines()
-        prefix = make_prefix(prefix)
         last_key = ""
         for number, line in enumerate(data):
             line = line.strip()
@@ -483,7 +481,7 @@ class TolerantParser(Parser):
             key = key.strip().lower()
             value = value.strip()
             if key:  # allows empty key be same as last key
-                key = prefix + key
+                key = make_prefix(prefix, key)
                 last_key = key
             else:
                 key = last_key
@@ -504,7 +502,6 @@ class SimpleIniParser(Parser):
     def read_data(self, lconfig, data: Union[Iterable, str], prefix: str = ""):
         if isinstance(data, str):
             data = data.splitlines()
-        prefix = make_prefix(prefix)
         last_key = ""
         known_keys = set()
         for number, line in enumerate(data):
@@ -513,7 +510,7 @@ class SimpleIniParser(Parser):
                 continue
             # handle sections
             if line.startswith("[") and line.endswith("]"):
-                prefix = make_prefix(line[1:-1].strip()).lower()
+                prefix = line[1:-1].strip().lower()
                 continue
             # handle multi line values
             if line.startswith(" ") or line.startswith("\t"):
@@ -532,7 +529,7 @@ class SimpleIniParser(Parser):
                         "or wrong multiline value." % (number, line, self.ASSIGN_CHAR)
                     )
                 key = key.strip().lower()
-                key = prefix + key
+                key = make_prefix(prefix, key)
                 last_key = key
                 if key in known_keys:
                     raise KeyError("Line %d: Key %r already set. Duplicate?" % (number, key))
