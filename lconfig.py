@@ -21,7 +21,7 @@ ConverterFunction = Callable[[str, List[str], "LConfig"], Any]
 
 def make_prefix(prefix: str, key: str = ""):
     if prefix and not prefix.endswith("."):
-        prefix = f"{prefix}.{key}"
+        return f"{prefix}.{key}"
     return f"{prefix}{key}"
 
 
