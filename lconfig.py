@@ -526,7 +526,7 @@ class SimpleIniParser(Parser):
                     raise ValueError(
                         "Invalid format in line %d: %r."
                         " No assignement ('=' or  ':') found "
-                        "or wrong multiline value." % (number, line, self.ASSIGN_CHAR)
+                        "or wrong multiline value." % (number, line)
                     )
                 key = key.strip().lower()
                 key = make_prefix(prefix, key)
